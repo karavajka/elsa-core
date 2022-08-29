@@ -4,8 +4,10 @@ using Elsa;
 using Elsa.ActivityDefinitions.EntityFrameworkCore.Extensions;
 using Elsa.ActivityDefinitions.EntityFrameworkCore.Sqlite;
 using Elsa.Extensions;
+using Elsa.Features.Extensions;
 using Elsa.Http;
 using Elsa.Http.Extensions;
+using Elsa.Identity.Features;
 using Elsa.JavaScript.Activities;
 using Elsa.JavaScript.Extensions;
 using Elsa.Jobs.Activities.Extensions;
@@ -30,12 +32,14 @@ using Elsa.Workflows.Runtime.Extensions;
 using Elsa.WorkflowServer.Web.Jobs;
 using FastEndpoints;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
+var configuration = builder.Configuration;
 
-EndpointSecurityOptions.DisableSecurity();
+//EndpointSecurityOptions.DisableSecurity();
 
 // Add Elsa services.
 services
@@ -56,6 +60,11 @@ services
             .AddActivity<RunJavaScript>()
             .AddActivity<Event>()
         )
+        .Use<IdentityFeature>(identity =>
+        {
+            identity.IdentityOptions = options => configuration.GetSection("Identity").Bind(options);
+            identity.TokenOptions = options => configuration.GetSection("Identity:Tokens").Bind(options);
+        })
         .UseJobActivities()
         .UseScheduling()
         .UseWorkflowPersistence(p => p.UseEntityFrameworkCore(ef => ef.UseSqlite()))
@@ -97,7 +106,9 @@ services
         options.SecurityTokenValidators.Add(new CustomValidator());
     });
 
-services.AddAuthorization(options => options.AddPolicy("WorkflowManagerPolicy", policy => policy.RequireAuthenticatedUser()));
+services.AddHttpContextAccessor();
+services.AddSingleton<IAuthorizationHandler, LocalHostRequirementHandler>();
+services.AddAuthorization(options => options.AddPolicy("SecurityRoot", policy => policy.AddRequirements(new LocalHostRequirement())));
 
 // Configure middleware pipeline.
 var app = builder.Build();
