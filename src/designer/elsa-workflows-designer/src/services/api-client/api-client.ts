@@ -1,4 +1,4 @@
-﻿import axios, {AxiosInstance, AxiosRequestConfig} from "axios";
+﻿import axios, {AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse} from "axios";
 import {Service as MiddlewareService} from 'axios-middleware';
 import {Container, Service} from 'typedi';
 import {EventBus} from '../event-bus';
@@ -28,8 +28,7 @@ export class ElsaApiClientProvider {
   constructor(private serverSettings: ServerSettings) {
   }
 
-  public async getHttpClient(): Promise<AxiosInstance>
-  {
+  public async getHttpClient(): Promise<AxiosInstance> {
     if (!!this.httpClient)
       return this.httpClient;
 
@@ -55,6 +54,15 @@ async function createHttpClient(baseAddress: string): Promise<AxiosInstance> {
 
   const httpClient = axios.create(config);
   const middlewareService = new MiddlewareService(httpClient);
+
+  middlewareService.register({
+    onResponseError(err: AxiosError) {
+      debugger;
+      if (err.response.status === 401) {
+
+      }
+    }
+  });
 
   await eventBus.emit(EventTypes.HttpClient.ClientCreated, this, {service: middlewareService, httpClient});
 
